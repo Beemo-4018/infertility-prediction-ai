@@ -19,7 +19,7 @@ infertility-prediction-ai/
 │   └── 03_modeling.ipynb      ← 모델링 & 앙상블
 ├── src/
 │   ├── preprocess.py          ← 전처리 함수 모음
-│   └── model.py               ← 모델 학습/예측 함수 모음
+│   └── train.py               ← 모델 학습/예측 함수 모음
 ├── submissions/               ← 제출 파일 버전 관리
 ├── .gitignore
 ├── requirements.txt
