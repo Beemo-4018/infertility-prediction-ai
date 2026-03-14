@@ -1,0 +1,16 @@
+# Data and Models
+data/
+models/
+submissions/*.csv
+Autogluon_Models/
+Autogluon_Models_v6/
+Autogluon_Models_v7/
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.env
+
+# OS
+.DS_Store

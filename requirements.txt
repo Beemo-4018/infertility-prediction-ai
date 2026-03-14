@@ -1,0 +1,20 @@
+# 데이터 핸들링 및 수치 연산
+pandas>=2.0.0
+numpy>=1.23.5
+
+# 머신러닝 기초 및 전처리 (Data Leakage 방지용 객체 포함)
+scikit-learn>=1.2.2
+
+# 고성능 부스팅 모델
+lightgbm>=4.0.0
+xgboost>=1.7.5
+catboost>=1.2
+
+# AutoML (ROC-AUC 극대화용 스태킹 앙상블)
+autogluon>=1.0.0
+
+# 가시화 및 기타
+matplotlib>=3.7.1
+seaborn>=0.12.2
+pyyaml>=6.0
+tqdm>=4.65.0
