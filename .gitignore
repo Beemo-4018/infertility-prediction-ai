@@ -34,3 +34,6 @@ env/
 # 로그/임시파일
 *.log
 *.tmpcatboost_info/
+src/catboost_info/
+src/catboost_info/
+catboost_info/
