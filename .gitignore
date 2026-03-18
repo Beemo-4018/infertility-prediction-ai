@@ -2,6 +2,9 @@
 data/
 models/
 submissions/*.csv
+submissions/oof/
+submissions/archive/
+catboost_info/
 Autogluon_Models/
 Autogluon_Models_v6/
 Autogluon_Models_v7/
