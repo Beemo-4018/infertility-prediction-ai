@@ -1,192 +1,203 @@
-# 난임 환자 임신 성공 여부 예측 AI
+# 난임 환자 임신 성공 여부 예측 AI 해커톤
 
-> 🏥 난임 환자의 시술 데이터를 분석하여 임신 성공 여부를 예측하는 AI 모델
-
----
-
-## 🎯 프로젝트 목표
-
-난임 시술(IVF, DI 등)을 받는 환자의 다양한 의료 정보를 바탕으로, 임신 성공 가능성을 사전에 예측합니다. 정확한 예측을 통해 환자 맞춤형 시술 계획 수립에 기여하는 것을 목표로 합니다.
-
-- **평가 지표**: ROC-AUC
-- **타겟**: 임신 성공 여부 (0: 실패, 1: 성공)
-- **클래스 비율**: 성공 25.83% / 실패 74.17% (불균형)
+> **DACON** 난임 환자 대상 임신 성공 여부 예측 AI 해커톤  
+> **Team Beemo** | 평가지표: ROC-AUC | **최고 LB: 0.74216**
 
 ---
 
-## 📊 데이터 설명
+## 📊 최종 성과
 
-> ⚠️ 데이터는 대회 규정상 저장소에 포함되지 않습니다. `data/` 폴더에 직접 배치해주세요.
-
-| 파일 | 행 수 | 컬럼 수 | 설명 |
-|------|-------|--------|------|
-| `train.csv` | 256,351 | 69 | 학습 데이터 (타겟 포함) |
-| `test.csv` | 90,067 | 68 | 추론 데이터 |
-| `sample_submission.csv` | 90,067 | 2 | 제출 양식 |
-
-**주요 피처 그룹**
-
-| 그룹 | 피처 예시 |
-|------|----------|
-| 환자 정보 | 시술 당시 나이, 임신 시도 경과 연수 |
-| 시술 정보 | 시술 유형(IVF/DI), 특정 시술 유형, 배란 자극 여부 |
-| 불임 원인 | 남성/여성/부부 불임 원인 플래그 18개 |
-| 배아 정보 | 총 생성·이식·저장 배아 수, 미세주입 관련 수치 |
-| 과거 이력 | 총 시술 횟수, IVF/DI 임신·출산 횟수 |
-| 경과일 | 난자 채취·혼합·이식·해동 경과일 |
-
-**결측치 주의 컬럼**
-
-| 컬럼 | 결측률 |
-|------|--------|
-| 임신 시도 또는 마지막 임신 경과 연수 | 96.3% |
-| 난자 해동 경과일 | 99.4% |
-| PGD/PGS 시술 여부 | ~99% |
+| 지표 | 값 |
+|------|-----|
+| 최고 LB AUC | **0.74216** |
+| 최고 CV AUC | **0.74083** |
+| 1위와의 차이 | 0.00019 |
 
 ---
 
-## 🧪 모델 실험 결과
-
-### Data Leakage 방지 원칙
-
-모든 실험에서 아래 원칙을 준수합니다.
-
-- LabelEncoder / Target Encoding은 **train 데이터로만 fit**, test는 transform만 수행
-- 결측치 보간 통계값은 **train 기준**으로만 계산 후 test에 적용
-- 파생 변수는 **각 행(row) 내 연산만** 수행
-- Target Encoding은 **K-Fold OOF 방식**으로 train 내부 leakage 차단
-
-### 버전별 실험 요약
-
-| 버전 | 주요 변경사항 | 피처 수 | LightGBM | XGBoost | CatBoost | 앙상블 CV AUC |
-|------|-------------|--------|----------|---------|---------|--------------|
-| v1 | 베이스라인 (기본 파생 피처, lr=0.05) | 87 | 0.73868 | 0.73967 | 0.73999 | 0.74018 |
-| v2 | 피처 강화 + lr=0.02 + Optuna 튜닝 | 106 | 0.74037 | 0.73989 | 0.74000 | 0.74047 |
-| v3 | Target Encoding + 교호작용 + 도메인 피처 | 121 | 0.74047 | 0.73960 | 0.74041 | **0.74060** |
-
-### 버전별 핵심 변경 내용
-
-**v1 → v2**
-- `learning_rate` 0.05 → 0.02, `n_estimators` 3,000 → 5,000
-- 시간 간격 피처 추가 (채취→이식, 혼합→이식 경과일 차이, 배반포 이식 추정)
-- 불임 원인 조합 피처 추가 (총 불임 원인 수, 복합 불임 여부)
-- Optuna 50 trials 하이퍼파라미터 탐색
-
-**v2 → v3**
-- K-Fold OOF Target Encoding 추가 (시술 시기 코드, 시술 유형 등 6개 컬럼)
-- 교호작용 피처 추가 (시술유형 × 나이, 시술유형 × 불임 주원인)
-- 도메인 지식 기반 치료 적합성 피처 추가 (남성요인-ICSI 매칭, 배란장애-자극 매칭 등)
-
----
-
-## 🏆 최종 모델 선택 이유
-
-**현재 최고 성능: v3 앙상블 (CV AUC 0.74060)**
-
-v3를 현재 최고 버전으로 선택한 이유는 다음과 같습니다.
-
-1. **일관된 성능 향상**: v1 → v2 → v3로 CV AUC가 단조 증가
-2. **Leakage 안전성**: 모든 피처 엔지니어링이 Leakage 규정을 준수
-3. **앙상블 안정성**: 세 모델의 OOF 예측을 CV AUC 기반 가중 평균으로 결합해 단일 모델 대비 분산 감소
-4. **도메인 지식 반영**: 단순 통계 피처 외에 의학적 치료 적합성을 피처로 반영해 모델의 해석 가능성 향상
-
-> LB(리더보드) 점수 확인 후 CV-LB 갭 분석 예정. 갭이 클 경우 오버피팅 의심 및 피처 재검토 진행.
-
----
-
-## ▶️ 실행 방법
-
-### 1. 환경 설정
-
-```bash
-git clone https://github.com/Beemo-4018/infertility-prediction-ai.git
-cd infertility-prediction-ai
-
-python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 2. 데이터 배치
-
-```
-data/
-├── train.csv
-├── test.csv
-└── sample_submission.csv
-```
-
-### 3. 학습 실행
-
-```bash
-# 최신 버전 (v3)
-python src/train_v3.py
-
-# 이전 버전
-python src/train_v2.py
-python src/train.py      # v1 베이스라인
-```
-
-### 4. 주요 설정값 (`train_v3.py` 상단)
-
-```python
-USE_OPTUNA    = True   # False로 변경 시 Optuna 생략, 빠른 실행 가능
-OPTUNA_TRIALS = 50     # Optuna 탐색 횟수 (시간 여유 있으면 100 권장)
-DATA_PATH     = '/Users/admin/Downloads/infertility-prediction-ai/data/'
-SAVE_PATH     = '/Users/admin/Downloads/infertility-prediction-ai/data/submissions/'
-```
-
-### 5. 출력 파일
-
-제출 파일은 `data/submissions/` 에 자동 저장됩니다.
-
-```
-submission_MMDD_HHMM_auc0pXXXXX.csv
-```
-
----
-
-## 📁 프로젝트 구조
+## 🗂️ 프로젝트 구조
 
 ```
 infertility-prediction-ai/
-│
-├── data/                        ← 데이터 폴더 (.gitignore 처리)
-│   ├── train.csv
-│   ├── test.csv
-│   ├── sample_submission.csv
-│   └── submissions/             ← 제출 파일 자동 저장
-│
-├── src/                         ← 학습 스크립트
-│   ├── train.py                 ← v1 베이스라인
-│   ├── train_v2.py              ← v2 피처 강화 + Optuna
-│   └── train_v3.py              ← v3 Target Encoding + 도메인 피처 (최신)
-│
-├── notebooks/                   ← EDA 및 실험용 노트북
-│
-├── requirements.txt
+├── data/
+│   ├── raw/
+│   │   ├── train.csv
+│   │   ├── test.csv
+│   │   └── sample_submission.csv
+│   └── submissions/
+├── src/
+│   ├── train_v5.py                  # LB 0.74198
+│   ├── train_v8.py                  # LB 0.74195 (LGB Optuna)
+│   ├── train_v8_tuned.py            # LB 0.74200 (전체 Optuna)
+│   ├── train_v8plus_v7b_final.py    # LB 0.74216 ← 팀 최고
+│   ├── train_vclean7.py             # CV 0.73184 (Clean Baseline)
+│   ├── train_vclean12.py            # CV 0.73999
+│   ├── feature_search.py            # 피처 기여도 자동 측정 v1
+│   ├── feature_search_v2.py         # 피처 기여도 자동 측정 v2
+│   ├── feature_search_v3.py         # 피처 기여도 자동 측정 v3
+│   ├── feature_search_clinic.py     # 클리닉 조합 TE 측정
+│   ├── fold_analysis.py             # Fold 분포 분석
+│   ├── blend.py                     # 블렌딩 스크립트
+│   ├── rank_blend.py                # Rank Averaging 블렌딩
+│   ├── check_corr.py                # 제출 파일 상관관계 확인
+│   └── train_autogluon.py           # AutoGluon (코랩용)
 └── README.md
 ```
 
 ---
 
-## 📦 주요 라이브러리
+## 🔧 환경 설정
 
-| 라이브러리 | 용도 |
-|-----------|------|
-| lightgbm | 그래디언트 부스팅 모델 |
-| xgboost | 그래디언트 부스팅 모델 |
-| catboost | 그래디언트 부스팅 모델 |
-| scikit-learn | 교차 검증, 전처리 |
-| optuna | 하이퍼파라미터 자동 탐색 |
-| pandas / numpy | 데이터 처리 |
+```bash
+conda create -n bmo python=3.10
+conda activate bmo
+pip install lightgbm xgboost catboost optuna scikit-learn pandas numpy scipy
+```
 
 ---
 
-## 👥 팀원
+## 🚀 실행 방법
 
-| 이름 | GitHub |
-|------|--------|
-| 이정결 | - |
-| 안병준 | - |
-| 이승연 | - |
+```bash
+# 팀 최고 성능 버전
+python src/train_v8plus_v7b_final.py
+
+# Clean Baseline 버전
+python src/train_vclean12.py
+
+# 피처 기여도 자동 측정
+python src/feature_search.py
+
+# 제출 파일 상관관계 확인
+python src/check_corr.py
+```
+
+---
+
+## 🏗️ 모델 아키텍처
+
+```
+Raw Data (256,351 × 69)
+        ↓
+   Preprocessing
+   ├── 결측치 처리 (train median)
+   ├── 횟수 컬럼 수치화 ('회' 제거)
+   └── 나이 수치화 (age_map)
+        ↓
+ Feature Engineering (130개)
+   ├── 배아 비율 피처 (9개)
+   ├── 시간 간격 피처 (5개) ← 가장 큰 기여
+   ├── 교호작용 피처 (9개)
+   ├── 클리닉 집계 피처 (7개, K-Fold OOF)
+   └── Target Encoding (12개 컬럼, K-Fold OOF)
+        ↓
+  LightGBM Optuna (50 trials, 3-Fold)
+        ↓
+  3-Model Ensemble
+   ├── LightGBM (Optuna 튜닝)
+   ├── XGBoost
+   └── CatBoost
+        ↓
+  11가지 앙상블 조합 자동 비교
+  (단순평균 / 성능가중 / Rank Normalization 등)
+        ↓
+    최고 CV 조합 제출
+```
+
+---
+
+## 🔬 핵심 피처
+
+### 피처 중요도 Top 10
+
+| 순위 | 피처 | 설명 |
+|------|------|------|
+| 1 | `배아_이식비율` | 이식배아 / 총생성배아 |
+| 2 | `미세주입_성공률` | ICSI 성공률 |
+| 3 | `시술시기코드_시술건수` | 클리닉 규모 (log1p) |
+| 4 | `시술시기코드_성공률` | 클리닉별 성공률 |
+| 5 | `나이_수치` | 시술 당시 나이 수치화 |
+| 6 | `과거_임신성공률` | 총임신 / 총시술 |
+| 7 | `이식된 배아 수` | 이번 시술 이식 배아 수 |
+| 8 | `총_불임원인_수` | 불임 원인 복잡도 |
+| 9 | `혼합_이식_간격` | 배아 배양 기간 |
+| 10 | `failure_streak` | 연속 실패 횟수 |
+
+### v7b 핵심 피처
+
+```python
+# 고령(38세+) 환자가 단일 배아 이식 선택 = 의사가 좋은 배아라고 판단한 신호
+df['고령_x_단일배아이식'] = df['고령_여부'] * df['단일 배아 이식 여부']
+```
+
+### 시간 간격 피처 (+0.00675 점프)
+
+```python
+df['혼합_이식_간격'] = df['배아 이식 경과일'] - df['난자 혼합 경과일']
+df['해동_이식_간격'] = df['배아 이식 경과일'] - df['배아 해동 경과일']
+df['배반포_이식추정'] = (df['혼합_이식_간격'] >= 5).astype(int)
+```
+
+---
+
+## 📈 버전별 성능
+
+| 버전 | CV AUC | LB AUC | 핵심 변경 |
+|------|--------|--------|---------|
+| v3 | 0.74060 | 0.74198 | Target Encoding + 도메인 피처 |
+| v5 | 0.74062 | 0.74198 | 클리닉 집계 피처 |
+| v8 | 0.74067 | 0.74195 | 미사용 컬럼 발굴 + LGB Optuna |
+| v8_tuned | 0.74073 | 0.74200 | XGB/CatBoost Optuna 추가 |
+| blend v5+v8 | — | 0.74205 | 50:50 블렌딩 |
+| **v8plus_v7b** | **0.74083** | **0.74216** | **고령×단일배아이식 + Rank Norm** |
+| vclean7 | 0.73184 | — | Clean Baseline + 시간간격 피처 |
+| vclean12 | 0.73999 | — | feature_search 상위 피처 추가 |
+
+---
+
+## 🔀 앙상블 전략
+
+### Rank Normalization
+
+```python
+# 확률값 대신 순위값으로 정규화 → 각 모델의 score 분포 차이 제거
+r_lgb = rankdata(oof_lgb) / len(oof_lgb)
+r_xgb = rankdata(oof_xgb) / len(oof_xgb)
+r_cat = rankdata(oof_cat) / len(oof_cat)
+```
+
+### 블렌딩 상관관계 분석
+
+```python
+# 제출 전 상관관계 확인 필수
+# 0.998 이상이면 블렌딩 효과 거의 없음
+python src/check_corr.py
+```
+
+---
+
+## 🛡️ Data Leakage 방지 원칙
+
+| 처리 | 방법 |
+|------|------|
+| Target Encoding | K-Fold OOF (val은 tr 통계만 사용) |
+| 결측치 보간 | train median → test 적용 |
+| LabelEncoder | train만 fit, Unknown 처리 |
+| **Pseudo-Labeling** | **절대 금지 (규정 위반 → 실격)** |
+
+---
+
+## 🧪 실패 교훈
+
+| 실험 | 결과 | 교훈 |
+|------|------|------|
+| 풀 스태킹 | CV 0.73481 폭락 | 메타 피처는 OOF만 |
+| TabNet + GPU | 불안정 | 25만행에서 트리 모델 우위 |
+| 교호작용으로 원본 대체 | CV 하락 | 교호작용은 원본에 추가 |
+| Pseudo-Labeling | 규정 위반 | 절대 사용 금지 |
+| 피처 183개로 확장 | CV 하락 | 피처 수보다 피처 품질 |
+| L2 스태킹 | L1보다 낮음 | 모델 다양성 부족 시 무의미 |
+
+---
+
+## 👥 Team Beemo
