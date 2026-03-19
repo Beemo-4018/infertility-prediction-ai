@@ -200,4 +200,4 @@ python src/check_corr.py
 
 ---
 
-## 👥 Team Beemo
+## 👥 Team 3
