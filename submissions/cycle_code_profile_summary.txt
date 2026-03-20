@@ -1,0 +1,20 @@
+시술 시기 코드 프로파일 요약
+
+코드 개수: 7
+최고 성공률 코드: TRYBLT
+최저 성공률 코드: TRDQAZ
+
+성공률 상위 코드
+- TRYBLT: success=0.2691, diff=+0.0107, train=36713
+- TRJXFG: success=0.2663, diff=+0.0079, train=36031
+- TRVNRY: success=0.2598, diff=+0.0014, train=36173
+
+성공률 하위 코드
+- TRDQAZ: success=0.2454, diff=-0.0129, train=38969
+- TRZKPL: success=0.2551, diff=-0.0032, train=35544
+- TRXQMD: success=0.2561, diff=-0.0022, train=34831
+
+train/test 비중 차이 큰 코드
+- TRZKPL: train_ratio=0.1387, test_ratio=0.1420, diff=+0.0034
+- TRXQMD: train_ratio=0.1359, test_ratio=0.1334, diff=-0.0024
+- TRVNRY: train_ratio=0.1411, test_ratio=0.1395, diff=-0.0017

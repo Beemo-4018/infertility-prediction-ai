@@ -25,7 +25,7 @@ def target_encode(train, test, col, target, n_splits=5, smooth=20):
     return train_enc, test_enc
 
 
-def preprocess_v22(train, test):
+def preprocess_v27(train, test):
     train = train.copy()
     test  = test.copy()
 
@@ -34,12 +34,25 @@ def preprocess_v22(train, test):
         '만18-34세': 26, '만35-37세': 36, '만38-39세': 38,
         '만40-42세': 41, '만43-44세': 43, '만45-50세': 47, '알 수 없음': -1
     }
+    donor_age_map = {
+        '만21세 이하': 20, '만21-25세': 23, '만26-30세': 28,
+        '만31-35세': 33, '만36-40세': 38, '만40세 이상': 42, '알 수 없음': -1
+    }
     for df in [train, test]:
         df['나이_수치']     = df['시술 당시 나이'].map(age_map).fillna(-1)
         df['고령_여부']     = (df['나이_수치'] >= 38).astype(int)
         df['초고령_여부']   = (df['나이_수치'] >= 43).astype(int)
         df['최적연령_여부'] = (df['나이_수치'] <= 36).astype(int)
-        df['age_numeric']   = df['나이_수치']
+
+        # ── [V27 핵심] 난자 실제 나이 분리 ──────────────────
+        # 본인 난자 → 시술 당시 나이 사용
+        # 기증 난자 → 기증자 나이 사용 (더 젊음 → 성공률 높음)
+        df['기증자나이_수치'] = df['난자 기증자 나이'].map(donor_age_map).fillna(-1)
+        df['난자_실제나이'] = df['나이_수치']  # 기본값: 본인 나이
+        mask_donor = df['난자 출처'] == '기증 제공'
+        df.loc[mask_donor, '난자_실제나이'] = df.loc[mask_donor, '기증자나이_수치']
+        # 기증자 나이 모를 경우 젊은 나이(23)로 대체 (기증자는 대체로 젊음)
+        df.loc[mask_donor & (df['난자_실제나이'] == -1), '난자_실제나이'] = 23
 
     # [2] 횟수 컬럼 수치화
     count_cols = [
@@ -114,6 +127,9 @@ def preprocess_v22(train, test):
         if '불명확 불임 원인' in df.columns:
             df['불명확_단독원인'] = ((df['불명확 불임 원인']==1) & (df['총_불임원인_수']==1)).astype(int)
 
+        # 불임 심각도 비율 (수장삭 아이디어 - 내 방식으로 구현)
+        df['여성_불임_비율'] = df['여성_불임원인_수'] / (df['남성_불임원인_수'] + df['여성_불임원인_수'] + 1e-6)
+
         for col in ['배아 해동 경과일', '임신 시도 또는 마지막 임신 경과 연수']:
             if col in df.columns:
                 df[col + '_결측'] = df[col].isnull().astype(int)
@@ -131,22 +147,30 @@ def preprocess_v22(train, test):
         df['고령_동결배아조합'] = ((df['고령_여부']==1) & (df['해동된 배아 수'].fillna(0) > 0)).astype(int)
         df['초고령_반복시술']   = ((df['초고령_여부']==1) & (df['반복시술_여부']==1)).astype(int)
 
-        # ── V18 추가 피처 ──────────────────────────────────
+        # ── V18 기존 피처 ──────────────────────────────────
         df['Implant_Efficiency']       = (df['이식된 배아 수'].fillna(0) / (df['총 생성 배아 수'].fillna(0) + 1e-5)).clip(0, 1)
         df['Frozen_Ratio']             = (df['해동된 배아 수'].fillna(0) / (df['이식된 배아 수'].fillna(0) + 1e-5)).clip(0, 1)
         df['Clinic_Concentration']     = (df['클리닉 내 총 시술 횟수_num'].fillna(0) / (df['총 시술 횟수_num'].fillna(0) + 1e-5))
-        df['Age_x_Implant_Efficiency'] = df['age_numeric'] * df['Implant_Efficiency']
-        df['Age_x_Embryo_Count']       = df['age_numeric'] * df['이식된 배아 수'].fillna(0)
-        df['Age_x_Transfer_Day']       = df['age_numeric'] * df['배아 이식 경과일'].fillna(0)
+
+        # 기존 나이 교호작용 (시술 나이 기준)
+        df['Age_x_Implant_Efficiency'] = df['나이_수치'] * df['Implant_Efficiency']
+        df['Age_x_Embryo_Count']       = df['나이_수치'] * df['이식된 배아 수'].fillna(0)
+        df['Age_x_Transfer_Day']       = df['나이_수치'] * df['배아 이식 경과일'].fillna(0)
+
+        # ── [V27 신규] 난자 실제나이 교호작용 ──────────────
+        # 기증 난자 케이스에서 기존 Age_x_Implant_Efficiency가 잘못된 나이를 쓰고 있었음
+        df['RealAge_x_Implant_Efficiency'] = df['난자_실제나이'] * df['Implant_Efficiency']
+        df['RealAge_x_Embryo_Count']       = df['난자_실제나이'] * df['이식된 배아 수'].fillna(0)
+        # 기증 여부 플래그
+        df['기증난자_여부'] = (df['난자 출처'] == '기증 제공').astype(int)
+        # 나이 차이 (시술나이 - 난자실제나이): 기증일수록 양수로 커짐
+        df['나이_난자나이_차이'] = df['나이_수치'] - df['난자_실제나이']
+
         df['Past_Success_Index']       = (df['총 출산 횟수_num'].fillna(0) + 1) / (df['총 시술 횟수_num'].fillna(0) + 2)
 
-        # ── V6 신규 피처 (의학적 근거, Label Encoding 전) ────
         df['Donor_Egg_Age_Reversal'] = (
-            (df['나이_수치'] >= 43) & (df['난자 출처'] == '기증 제공')
-        ).astype(int)
-
-        df['Gold_Standard_Transfer'] = (
-            (df['단일 배아 이식 여부'] == 1) & (df['배아 이식 경과일'] == 5)
+            (df['나이_수치'] >= 43) &
+            (df['난자 출처'] == '기증 제공')
         ).astype(int)
 
         df['Poor_Prognosis_Multi_Early'] = (
@@ -154,17 +178,6 @@ def preprocess_v22(train, test):
             (df['배아 이식 경과일'].fillna(0) <= 3) &
             (df['이식된 배아 수'].fillna(0) >= 2)
         ).astype(int)
-
-        lethal_procs = ['ICSI:ICSI', 'IVF:IVF']
-        df['Lethal_Procedure_Penalty'] = df['특정 시술 유형'].isin(lethal_procs).astype(int)
-
-        df['PCOS_High_Yield_Advantage'] = (
-            (df['불임 원인 - 배란 장애'] == 1) &
-            (df['수집된 신선 난자 수'].fillna(0) >= 10)
-        ).astype(int)
-
-        attrition = (df['수집된 신선 난자 수'].fillna(0) - df['혼합된 난자 수'].fillna(0)).clip(lower=0)
-        df['Male_Factor_Attrition'] = (df['남성_불임원인_수'] > 0).astype(int) * attrition
 
         df['Surplus_Blastocyst_Reserve'] = (
             df['저장된 배아 수'].fillna(0) *
@@ -181,24 +194,32 @@ def preprocess_v22(train, test):
             df['IVF 임신 횟수_num'].fillna(0)
         ).clip(lower=0)
 
-        df['Fresh_Donor_Sperm_Advantage'] = (
-            (df['정자 출처'] == '기증 제공') &
-            (df['신선 배아 사용 여부'] == 1)
-        ).astype(int)
+        attrition = (df['수집된 신선 난자 수'].fillna(0) - df['혼합된 난자 수'].fillna(0)).clip(lower=0)
+        df['Male_Factor_Attrition'] = (df['남성_불임원인_수'] > 0).astype(int) * attrition
 
-    # [4] drop_cols 정의 (시점 주의: 클리닉 조합 컬럼은 [5]에서 생성됨)
-    zero_importance_cols = [
-        '착상 전 유전 검사 사용 여부',
-        '불임 원인 - 정자 면역학적 요인',
-        'PGD 시술 여부',
-        'PGS 시술 여부',
-        '난자 채취 경과일',
-        '난자 해동 경과일',
-        '불임 원인 - 자궁경부 문제',
-        '불임 원인 - 여성 요인',
+    # [4] drop_cols 정의
+    v23_drops = [
+        '불임 원인 - 정자 형태', '신선 배아 사용 여부',
+        '불임 원인 - 정자 운동성', '불임 원인 - 정자 농도',
+    ]
+    v24_drops = [
+        '난자 채취 경과일', '착상 전 유전 검사 사용 여부',
+        '난자 해동 경과일', 'PGD 시술 여부', 'PGS 시술 여부',
+        '저장된 신선 난자 수', '불임 원인 - 정자 면역학적 요인',
+        '불임 원인 - 여성 요인', '불임 원인 - 자궁경부 문제',
+    ]
+    v25_drops = [
+        '초고령_반복시술', '채취_혼합_간격', '동결 배아 사용 여부',
+        '여성 주 불임 원인', '고령_동결배아조합', '여성 부 불임 원인',
+        '대리모 여부', '난자 혼합 경과일', '남성 부 불임 원인',
+        '배아 해동 경과일_결측', '배아 해동 경과일',
+    ]
+    v26a_drops = [
+        '반복시술_여부', '부부 주 불임 원인',
+        '부부 부 불임 원인', '남성 주 불임 원인',
     ]
 
-    drop_cols = ['ID', TARGET] + count_cols + zero_importance_cols
+    drop_cols = ['ID', TARGET] + count_cols + v23_drops + v24_drops + v25_drops + v26a_drops
     drop_cols = [c for c in drop_cols if c in train.columns]
 
     feature_cols = [c for c in train.columns if c not in drop_cols]
@@ -240,13 +261,13 @@ def preprocess_v22(train, test):
 
     train['클리닉_나이조합'] = train[clinic_col].astype(str) + '_' + train['시술 당시 나이'].astype(str)
     test['클리닉_나이조합']  = test[clinic_col].astype(str)  + '_' + test['시술 당시 나이'].astype(str)
-    tr_enc, te_enc = target_encode(train, test, '클리닉_나이조합', TARGET, smooth=100)
+    tr_enc, te_enc = target_encode(train, test, '클리닉_나이조합', TARGET, smooth=20)
     train['클리닉_나이별성공률'] = tr_enc
     test['클리닉_나이별성공률']  = te_enc
 
     train['클리닉_시술유형조합'] = train[clinic_col].astype(str) + '_' + train['특정 시술 유형'].astype(str)
     test['클리닉_시술유형조합']  = test[clinic_col].astype(str)  + '_' + test['특정 시술 유형'].astype(str)
-    tr_enc, te_enc = target_encode(train, test, '클리닉_시술유형조합', TARGET, smooth=100)
+    tr_enc, te_enc = target_encode(train, test, '클리닉_시술유형조합', TARGET, smooth=20)
     train['클리닉_시술유형별성공률'] = tr_enc
     test['클리닉_시술유형별성공률']  = te_enc
 
@@ -269,7 +290,6 @@ def preprocess_v22(train, test):
             test[col + '_te']  = te_enc
 
     # [7] Label Encoding
-    # Gemini 버그 수정: 후반 생성 조합 컬럼 명시적 제거
     final_drop = drop_cols + [
         '클리닉_나이조합', '클리닉_시술유형조합',
         '시술유형_나이조합', '시술유형_불임주원인조합'

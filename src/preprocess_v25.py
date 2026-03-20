@@ -25,7 +25,7 @@ def target_encode(train, test, col, target, n_splits=5, smooth=20):
     return train_enc, test_enc
 
 
-def preprocess_v22(train, test):
+def preprocess_v25(train, test):
     train = train.copy()
     test  = test.copy()
 
@@ -39,7 +39,7 @@ def preprocess_v22(train, test):
         df['고령_여부']     = (df['나이_수치'] >= 38).astype(int)
         df['초고령_여부']   = (df['나이_수치'] >= 43).astype(int)
         df['최적연령_여부'] = (df['나이_수치'] <= 36).astype(int)
-        df['age_numeric']   = df['나이_수치']
+        # age_numeric 제거 (나이_수치와 100% 동일)
 
     # [2] 횟수 컬럼 수치화
     count_cols = [
@@ -135,18 +135,15 @@ def preprocess_v22(train, test):
         df['Implant_Efficiency']       = (df['이식된 배아 수'].fillna(0) / (df['총 생성 배아 수'].fillna(0) + 1e-5)).clip(0, 1)
         df['Frozen_Ratio']             = (df['해동된 배아 수'].fillna(0) / (df['이식된 배아 수'].fillna(0) + 1e-5)).clip(0, 1)
         df['Clinic_Concentration']     = (df['클리닉 내 총 시술 횟수_num'].fillna(0) / (df['총 시술 횟수_num'].fillna(0) + 1e-5))
-        df['Age_x_Implant_Efficiency'] = df['age_numeric'] * df['Implant_Efficiency']
-        df['Age_x_Embryo_Count']       = df['age_numeric'] * df['이식된 배아 수'].fillna(0)
-        df['Age_x_Transfer_Day']       = df['age_numeric'] * df['배아 이식 경과일'].fillna(0)
+        df['Age_x_Implant_Efficiency'] = df['나이_수치'] * df['Implant_Efficiency']
+        df['Age_x_Embryo_Count']       = df['나이_수치'] * df['이식된 배아 수'].fillna(0)
+        df['Age_x_Transfer_Day']       = df['나이_수치'] * df['배아 이식 경과일'].fillna(0)
         df['Past_Success_Index']       = (df['총 출산 횟수_num'].fillna(0) + 1) / (df['총 시술 횟수_num'].fillna(0) + 2)
 
-        # ── V6 신규 피처 (의학적 근거, Label Encoding 전) ────
+        # ── V6 신규 피처 (효과 있는 것만 유지) ───────────────
         df['Donor_Egg_Age_Reversal'] = (
-            (df['나이_수치'] >= 43) & (df['난자 출처'] == '기증 제공')
-        ).astype(int)
-
-        df['Gold_Standard_Transfer'] = (
-            (df['단일 배아 이식 여부'] == 1) & (df['배아 이식 경과일'] == 5)
+            (df['나이_수치'] >= 43) &
+            (df['난자 출처'] == '기증 제공')
         ).astype(int)
 
         df['Poor_Prognosis_Multi_Early'] = (
@@ -154,17 +151,6 @@ def preprocess_v22(train, test):
             (df['배아 이식 경과일'].fillna(0) <= 3) &
             (df['이식된 배아 수'].fillna(0) >= 2)
         ).astype(int)
-
-        lethal_procs = ['ICSI:ICSI', 'IVF:IVF']
-        df['Lethal_Procedure_Penalty'] = df['특정 시술 유형'].isin(lethal_procs).astype(int)
-
-        df['PCOS_High_Yield_Advantage'] = (
-            (df['불임 원인 - 배란 장애'] == 1) &
-            (df['수집된 신선 난자 수'].fillna(0) >= 10)
-        ).astype(int)
-
-        attrition = (df['수집된 신선 난자 수'].fillna(0) - df['혼합된 난자 수'].fillna(0)).clip(lower=0)
-        df['Male_Factor_Attrition'] = (df['남성_불임원인_수'] > 0).astype(int) * attrition
 
         df['Surplus_Blastocyst_Reserve'] = (
             df['저장된 배아 수'].fillna(0) *
@@ -181,24 +167,47 @@ def preprocess_v22(train, test):
             df['IVF 임신 횟수_num'].fillna(0)
         ).clip(lower=0)
 
-        df['Fresh_Donor_Sperm_Advantage'] = (
-            (df['정자 출처'] == '기증 제공') &
-            (df['신선 배아 사용 여부'] == 1)
-        ).astype(int)
+        attrition = (df['수집된 신선 난자 수'].fillna(0) - df['혼합된 난자 수'].fillna(0)).clip(lower=0)
+        df['Male_Factor_Attrition'] = (df['남성_불임원인_수'] > 0).astype(int) * attrition
 
-    # [4] drop_cols 정의 (시점 주의: 클리닉 조합 컬럼은 [5]에서 생성됨)
-    zero_importance_cols = [
-        '착상 전 유전 검사 사용 여부',
-        '불임 원인 - 정자 면역학적 요인',
-        'PGD 시술 여부',
-        'PGS 시술 여부',
-        '난자 채취 경과일',
-        '난자 해동 경과일',
-        '불임 원인 - 자궁경부 문제',
-        '불임 원인 - 여성 요인',
+    # [4] drop_cols 정의
+    # V23에서 제거한 것
+    v23_drops = [
+        '불임 원인 - 정자 형태',
+        '신선 배아 사용 여부',
+        '불임 원인 - 정자 운동성',
+        '불임 원인 - 정자 농도',
     ]
 
-    drop_cols = ['ID', TARGET] + count_cols + zero_importance_cols
+    # V24 추가 제거 (V23에서 중요도 0으로 확인된 것)
+    v24_drops = [
+        '난자 채취 경과일',
+        '착상 전 유전 검사 사용 여부',
+        '난자 해동 경과일',
+        'PGD 시술 여부',
+        'PGS 시술 여부',
+        '저장된 신선 난자 수',
+        '불임 원인 - 정자 면역학적 요인',
+        '불임 원인 - 여성 요인',
+        '불임 원인 - 자궁경부 문제',
+    ]
+
+        # ── [V25 신규] 중요도 20 미만 피처 제거 ──
+    v25_drops = [
+        '초고령_반복시술',       # 17.6
+        '채취_혼합_간격',        # 15.7
+        '동결 배아 사용 여부',    # 13.7
+        '여성 주 불임 원인',     # 12.6
+        '고령_동결배아조합',      # 12.5
+        '여성 부 불임 원인',     # 12.1
+        '대리모 여부',           # 11.8
+        '난자 혼합 경과일',       # 10.7
+        '남성 부 불임 원인',     # 7.8
+        '배아 해동 경과일_결측',  # 6.6
+        '배아 해동 경과일',       # 0.4  ← 사실상 노이즈
+    ]
+
+    drop_cols = ['ID', TARGET] + count_cols + v23_drops + v24_drops + v25_drops
     drop_cols = [c for c in drop_cols if c in train.columns]
 
     feature_cols = [c for c in train.columns if c not in drop_cols]
@@ -211,7 +220,7 @@ def preprocess_v22(train, test):
     train[cat_cols] = train[cat_cols].fillna('Unknown')
     test[cat_cols]  = test[cat_cols].fillna('Unknown')
 
-    # [5] 클리닉 집계 피처
+    # [5] 클리닉 집계 피처 (smooth=20 유지)
     print('  클리닉 집계 피처 생성 중...')
     clinic_col  = '시술 시기 코드'
     global_mean = train[TARGET].mean()
@@ -240,13 +249,13 @@ def preprocess_v22(train, test):
 
     train['클리닉_나이조합'] = train[clinic_col].astype(str) + '_' + train['시술 당시 나이'].astype(str)
     test['클리닉_나이조합']  = test[clinic_col].astype(str)  + '_' + test['시술 당시 나이'].astype(str)
-    tr_enc, te_enc = target_encode(train, test, '클리닉_나이조합', TARGET, smooth=100)
+    tr_enc, te_enc = target_encode(train, test, '클리닉_나이조합', TARGET, smooth=20)
     train['클리닉_나이별성공률'] = tr_enc
     test['클리닉_나이별성공률']  = te_enc
 
     train['클리닉_시술유형조합'] = train[clinic_col].astype(str) + '_' + train['특정 시술 유형'].astype(str)
     test['클리닉_시술유형조합']  = test[clinic_col].astype(str)  + '_' + test['특정 시술 유형'].astype(str)
-    tr_enc, te_enc = target_encode(train, test, '클리닉_시술유형조합', TARGET, smooth=100)
+    tr_enc, te_enc = target_encode(train, test, '클리닉_시술유형조합', TARGET, smooth=20)
     train['클리닉_시술유형별성공률'] = tr_enc
     test['클리닉_시술유형별성공률']  = te_enc
 
@@ -268,8 +277,7 @@ def preprocess_v22(train, test):
             train[col + '_te'] = tr_enc
             test[col + '_te']  = te_enc
 
-    # [7] Label Encoding
-    # Gemini 버그 수정: 후반 생성 조합 컬럼 명시적 제거
+    # [7] Label Encoding (버그 수정: 후반 생성 조합 컬럼 명시적 제거)
     final_drop = drop_cols + [
         '클리닉_나이조합', '클리닉_시술유형조합',
         '시술유형_나이조합', '시술유형_불임주원인조합'

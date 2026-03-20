@@ -1,158 +1,194 @@
-# Fertility Prediction AI
+# 난임 임신 성공 여부 예측 프로젝트
 
-난임 환자 임신 성공 여부 예측 대회용 실험 저장소입니다. 현재는 `v8plus` 계열 피처 엔지니어링과 `LightGBM + XGBoost + CatBoost` 앙상블을 중심으로 실험하고 있습니다.
+난임 치료 관련 정형 데이터를 기반으로 임신 성공 여부를 예측한 머신러닝 프로젝트입니다.  
+대회형 환경에서 ROC-AUC를 기준으로 모델을 개선했고, 피처 엔지니어링, 검증 체계, 앙상블, 리더보드 해석까지 전 과정을 직접 설계하며 발전시켰습니다.
 
-## 현재 상태
+이 저장소에는 다음이 포함되어 있습니다.
 
-- 현재 기준 베스트 로컬 CV: `0.74078`
-- 현재 베스트 실험: `v8plus_v5b`
-- 현재 메인 베이스라인으로 보는 코드: [`train_v8plus_v5.py`](./train_v8plus_v5.py)
-- 다음 검증 후보: [`train_v8plus_v6a.py`](./train_v8plus_v6a.py)
+- 최종 학습 파이프라인
+- 버전별 피처 엔지니어링 실험 코드
+- 빠른 스크리닝용 검증 스크립트
+- 세미풀 검증 및 피처 다이어트 도구
+- 제출 파일과 중요도/실험 로그 산출물
 
-`v5b`에서 유지하기로 판단한 핵심 파생변수 3개:
+## 프로젝트 개요
 
-- `난자정자출처조합_te`
-- `총배아대비_해동비율`
-- `IVF_실패부담`
+- 문제 유형: 이진 분류
+- 목표: 난임 치료 후 임신 성공 여부 예측
+- 평가 지표: ROC-AUC
+- 데이터 규모
+  - Train: `256,351 x 69`
+  - Test: `90,067 x 68`
+  - 양성 비율: `25.83%`
+- 실행 환경: Windows / Python / Conda
+- 원본 데이터 위치: [data/raw](c:\fertility-prediction-ai\data\raw)
 
-빠른 스크리닝 기준으로는 추가 후보 3개 중 `IVF_출산전환율`이 가장 유망하게 나왔고, 이를 단일 추가한 정식 검증 버전이 `v6a`입니다.
+## 핵심 결과
 
-## 버전 히스토리
+- 프로젝트 진행 중 확인한 최고 리더보드 점수: `0.7421840512`
+- 최종 후보군의 로컬 CV 범위: 약 `0.7408x`
+- 핵심 인사이트: 로컬 CV가 높다고 반드시 리더보드 점수가 높아지지는 않았음
 
-최근 주요 버전 성능 기록:
+대표 실험 파일:
 
-- `v8plus_cpu`: `0.74071`
-- `v8plus_gpu`: `0.74066`
-- `v8plus_v2`: `0.74073`
-- `v8plus_v3`: `0.74076`
-- `v8plus_v4`: `0.74065`
-- `v8plus_v4a`: `0.74063`
-- `v8plus_v5`(6개 동시 추가): `0.74069`
-- `v8plus_v5a`: `0.74073`
-- `v8plus_v5b`: `0.74078`
-- `v8plus_v5c`(조합 TE 제거 검증): `0.74073`
+| 파일 | 역할 | 설명 |
+|---|---|---|
+| `train_v8plus_v8_final.py` | 안정적인 최종 베이스라인 | 메인 엔트리에서 사용하는 기본 파이프라인 |
+| `train_v8plus_v8_final_seedavg.py` | 시드 평균 앙상블 실험 | CV는 올랐지만 LB 개선은 일관되지 않았음 |
+| `train_v12_final.py` | 후반부 고비용 실험 | 더 강한 피처 엔지니어링과 넓은 앙상블 구성 |
+| `train_v12_lite_check.py` | 빠른 수동 피처 다이어트 검증 | 한 번 실행으로 CV와 중요도를 함께 확인 |
+| `train_v12_semifull_eval.py` | 세미풀 검증 | 스크린보다 현실적이고 final보다 가벼운 검증 |
 
-해석 요약:
+## 폴더 / 파일 구조
 
-- `v3` 이후 추가 피처 다이어트는 성능 개선으로 이어지지 않았습니다.
-- `v5a`의 3개 추가보다 `v5b`의 3개 추가가 더 효과적이었습니다.
-- 현재는 `v5b` 3개를 유지한 상태에서 단일 파생변수를 하나씩 추가 검증하는 전략이 가장 합리적입니다.
+주요 학습 및 실험 파일:
 
-## 현재 실험 전략
+- [main.py](c:\fertility-prediction-ai\main.py): 현재 안정 버전 실행용 엔트리
+- [train_v8plus_v8_final.py](c:\fertility-prediction-ai\train_v8plus_v8_final.py): v8 최종 파이프라인
+- [train_v8plus_v8_final_seedavg.py](c:\fertility-prediction-ai\train_v8plus_v8_final_seedavg.py): 시드 평균 실험
+- [train_v8plus_v8_lgb_screen.py](c:\fertility-prediction-ai\train_v8plus_v8_lgb_screen.py): 빠른 LightGBM 스크리닝
+- [train_v12_final.py](c:\fertility-prediction-ai\train_v12_final.py): 후반부 최종 실험 파이프라인
+- [train_v12_lite_check.py](c:\fertility-prediction-ai\train_v12_lite_check.py): 중요도 기반 수동 피처 다이어트용 체크 스크립트
+- [train_v12_semifull_eval.py](c:\fertility-prediction-ai\train_v12_semifull_eval.py): 세미풀 비교/검증 스크립트
 
-1. `v5`를 실질 베이스라인으로 유지
-2. `v5b` 핵심 3개는 유지
-3. 추가 후보는 한 번에 많이 넣지 않고 단일 변수 기준으로 검증
-4. 빠른 스크리닝은 `LightGBM 3-fold`
-5. 최종 판단은 정식 `5-fold + 3모델 앙상블`
+전처리 및 보조 모듈:
 
-현재 우선순위:
+- [src/preprocess.py](c:\fertility-prediction-ai\src\preprocess.py)
+- [src/preprocess_v25.py](c:\fertility-prediction-ai\src\preprocess_v25.py)
+- [src/preprocess_v26a.py](c:\fertility-prediction-ai\src\preprocess_v26a.py)
+- [src/preprocess_v27.py](c:\fertility-prediction-ai\src\preprocess_v27.py)
+- [src/utils.py](c:\fertility-prediction-ai\src\utils.py)
 
-1. `IVF_출산전환율`
-2. `출산전환율`
-3. `기증자정자_비율`
+데이터 및 결과물:
 
-## 주요 파일
+- [data/raw](c:\fertility-prediction-ai\data\raw): 원본 대회 데이터
+- [data/submissions](c:\fertility-prediction-ai\data\submissions): 제출 파일, 중요도, 실험 산출물
+- [submissions](c:\fertility-prediction-ai\submissions): 초기 제출/분석 산출물
 
-- [`train_v8plus.py`](./train_v8plus.py)
-  초기 `v8plus` 베이스라인
+## 접근 방식
 
-- [`train_v8plus_v2.py`](./train_v8plus_v2.py)
-  중요도 기반 1차 피처 다이어트 반영
+프로젝트는 아래 사이클을 반복하며 발전했습니다.
 
-- [`train_v8plus_v3.py`](./train_v8plus_v3.py)
-  `v2` 이후 추가 정리와 확장 실험의 기준점
+1. 도메인 해석 기반 피처 엔지니어링
+2. 범주형/조합 피처에 대한 OOF 타깃 인코딩
+3. LightGBM, XGBoost, CatBoost, ExtraTrees, RandomForest 비교
+4. 빠른 스크린 실험으로 후보 압축
+5. 세미풀 검증과 최종 파이프라인 검증 후 제출
 
-- [`train_v8plus_v5.py`](./train_v8plus_v5.py)
-  현재 실질 메인 베이스. `v5b`에서 검증된 3개 파생변수 반영
+핵심 피처 유형:
 
-- [`train_v8plus_v6a.py`](./train_v8plus_v6a.py)
-  `v5 + IVF_출산전환율` 단일 추가 정식 검증 버전
+- 클리닉 단위 집계 성공률 피처
+- 나이, 시술 유형, 불임 원인 조합 피처
+- 배아/난자/정자 관련 비율 및 효율 피처
+- 시술 이력 및 시기 기반 파생 피처
 
-- [`screen_v5_feature_ablation.py`](./screen_v5_feature_ablation.py)
-  `v5` 핵심 피처 제거 영향 빠른 비교용 스크립트
+## 잘 먹힌 전략
 
-- [`screen_v5_single_additions.py`](./screen_v5_single_additions.py)
-  `v5` 기준 단일 추가 후보 빠른 비교용 스크립트
+- 클리닉 단위 집계 피처가 지속적으로 강한 신호를 보였습니다.
+- 고카디널리티 범주형 변수에 OOF 타깃 인코딩이 효과적이었습니다.
+- 한 번에 큰 변경보다, 해석 가능한 작은 변경이 더 안정적으로 성능을 올렸습니다.
+- 가벼운 스크리닝 스크립트로 실험 후보를 미리 압축한 것이 시간 절약에 도움이 됐습니다.
+- 개별 모델 차이가 작아도 OOF 기반 가중 앙상블은 안정적으로 도움이 됐습니다.
 
-- [`feature_diet_search_v8plus.py`](./feature_diet_search_v8plus.py)
-  중요도 기반 iterative feature diet 실험용 스크립트
+## 잘 안 먹힌 전략
 
-## 디렉토리 구조
+- 더 높은 CV가 항상 더 높은 리더보드 점수로 이어지지는 않았습니다.
+- 시드 평균 앙상블은 CV를 올렸지만 실제 LB는 오히려 떨어지는 경우가 있었습니다.
+- 공격적인 피처 다이어트는 로컬 검증에선 안전해 보여도 최종 LB에서 손해를 줄 수 있었습니다.
+- GPU가 당연히 더 좋을 것 같았지만, 이 프로젝트에서는 CPU가 더 빠르고 더 강한 경우가 많았습니다.
+- 여러 피처를 한꺼번에 바꾸는 방식은 해석과 검증이 어려워 신뢰도가 낮았습니다.
 
-```text
-data/
-  raw/                원본 train/test/sample_submission
+## 트러블슈팅 요약
 
-submissions/
-  *.csv               제출 파일, 중요도 파일, 스크리닝 결과
-  oof/                모델별 OOF / prediction numpy 저장소
+### 1. CPU와 GPU 결과가 다르게 나왔던 문제
 
-src/
-  기존 전처리 코드
+처음에는 GPU가 더 빠르고 성능도 좋을 것으로 기대했지만, 실제로는 이 데이터와 설정에서 CPU가 더 빠르고 더 좋은 경우가 반복적으로 나왔습니다.  
+그래서 하드웨어에 대한 가정을 믿기보다, 같은 조건에서 CPU/GPU를 직접 비교하고 이후 실험은 CPU 기준으로 고정했습니다.
 
-train_v8plus*.py      실험 버전별 학습 스크립트
-screen_*.py           빠른 스크리닝용 스크립트
+### 2. CV는 올랐는데 리더보드 점수는 떨어진 문제
+
+후반부 실험에서 여러 번 겪은 문제였습니다.  
+특히 seed averaging 같은 기법은 로컬 CV는 분명히 좋아졌지만 실제 LB는 떨어지는 결과가 나왔습니다.
+
+이후에는:
+
+- 로컬 CV는 후보 선별용으로 사용
+- 반복적으로 확인된 LB 결과를 더 신뢰
+- 아주 작은 CV 개선에는 과도한 의미를 부여하지 않음
+
+방식으로 실험 프로세스를 바꿨습니다.
+
+### 3. 피처 다이어트가 로컬에서는 괜찮아 보였지만 최종 성능을 해친 문제
+
+LightGBM 기준 importance가 낮거나 0인 피처를 제거하는 방식은 빠르게 후보를 줄이는 데는 유용했습니다.  
+하지만 실제 final 앙상블과 LB에서는 일부 저중요도 피처가 미세하게 기여하고 있었습니다.
+
+그래서 이후에는:
+
+- screen 결과는 후보 생성용
+- semi-full 결과는 중간 검증용
+- final 결과만 제출 판단 기준
+
+으로 역할을 분리했습니다.
+
+### 4. 모델을 많이 넣는다고 앙상블이 좋아지지 않았던 문제
+
+모델 수를 늘리면 다양성이 생길 것이라 기대했지만, 실제 최적 가중치를 보면 기여도가 거의 0에 가까운 모델도 있었습니다.  
+결국 중요한 것은 모델 개수보다, 서로 다른 신호를 진짜로 제공하는지 여부였습니다.
+
+## 빠른 실행 방법
+
+의존성 설치:
+
+```powershell
+pip install -r requirements.txt
 ```
 
-## 실행 예시
+현재 안정 버전 실행:
 
-정식 학습:
-
-```bash
-python train_v8plus_v5.py
-python train_v8plus_v6a.py
+```powershell
+python main.py
 ```
 
-빠른 스크리닝:
+후반부 최종 실험 실행:
 
-```bash
-python screen_v5_feature_ablation.py
-python screen_v5_single_additions.py
+```powershell
+python train_v12_final.py
 ```
 
-## 정리 계획
+빠른 중요도 + CV 체크:
 
-학습이 끝난 뒤 아래 순서로 정리하는 것을 권장합니다.
+```powershell
+python train_v12_lite_check.py
+```
 
-### 1. 유지할 파일
+드롭 리스트를 반영한 재실행:
 
-- 각 주요 버전의 최고 제출 파일 1개
-- 각 주요 버전의 `feature_importance_*.csv`
-- 최근 스크리닝 결과 CSV
-- 현재 사용 중인 `train_v8plus_v*.py`
-- 현재 기준 베스트와 다음 검증 후보 코드
+```powershell
+python train_v12_lite_check.py --drop-file data/submissions/v12_lite_check/drop_cols_zero_only.csv
+```
 
-### 2. 아카이브할 파일
+## 산출물
 
-- 오래된 제출 CSV 중 같은 버전의 하위 성능 파일
-- 과거 세대(`v26`, `v27` 등) OOF 산출물
-- 더 이상 참조하지 않는 중간 실험 CSV
+주요 산출물:
 
-권장 아카이브 위치:
+- 제출용 CSV 파일
+- 피처 중요도 CSV 파일
+- zero importance / low importance 후보 목록
+- 세미풀 비교 결과 CSV
+- 피처 다이어트 로그
 
-- `submissions/archive/`
-- `submissions/oof/archive/`
+## 포트폴리오 문서
 
-### 3. 지금은 건드리지 말 것
+포트폴리오용 서술형 문서는 아래 파일에 정리했습니다.
 
-학습이 실행 중일 때는 아래 파일을 이동/삭제하지 않습니다.
+- [PORTFOLIO_CASE_STUDY.md](c:\fertility-prediction-ai\PORTFOLIO_CASE_STUDY.md)
 
-- 가장 최근 생성 중인 `sub_v8plus_*.csv`
-- 가장 최근 생성 중인 `feature_importance_*.csv`
-- 현재 러닝 중인 버전의 `submissions/oof/*.npy`
+이 문서에는 다음 내용을 담았습니다.
 
-### 4. GitHub 브랜치 업로드 전 체크리스트
-
-- `README.md` 최신화
-- 현재 기준 베스트 버전과 점수 명시
-- 불필요한 대용량 산출물 제외 여부 확인
-- `.gitignore`에 캐시/임시 파일 점검
-- 커밋 메시지에 실험 기준점 기록
-
-## 다음 할 일
-
-- `v6a` 결과 확인
-- `v6a`가 상승하면 새 베이스로 채택
-- 이후 `출산전환율`, `기증자정자_비율` 순서로 단일 추가 검증
-- 학습 종료 후 `submissions/`와 `submissions/oof/` 아카이브 정리
+- 프로젝트 배경
+- 내가 맡은 역할
+- 모델링 전략
+- 성과
+- 시행착오와 트러블슈팅
+- 이 프로젝트를 통해 보여줄 수 있는 역량
